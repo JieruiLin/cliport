@@ -47,7 +47,6 @@ class TwoStreamClipLingUNetTransporterAgent(TransporterAgent):
         inp_img = frame['img']
         p0, p0_theta = frame['p0'], frame['p0_theta']
         lang_goal = frame['lang_goal']
-
         inp = {'inp_img': inp_img, 'lang_goal': lang_goal}
         out = self.attn_forward(inp, softmax=False)
         return self.attn_criterion(backprop, compute_err, inp, out, p0, p0_theta)

@@ -15,7 +15,7 @@ class OneStreamAttentionLangFusion(TwoStreamAttentionLangFusion):
         stream_one_fcn, _ = self.stream_fcn
         stream_one_model = models.names[stream_one_fcn]
 
-        self.attn_stream_one = stream_one_model(self.in_shape, 1, self.cfg, self.device, self.preprocess)
+        self.attn_stream_one = stream_one_model(self.in_shape, 1, self.cfg, self.device, self.preprocess).cuda()
         print(f"Attn FCN: {stream_one_fcn}")
 
     def attend(self, x, l):

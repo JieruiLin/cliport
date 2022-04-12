@@ -13,8 +13,8 @@ class OneStreamTransportLangFusion(TwoStreamTransportLangFusion):
         stream_one_fcn, _ = self.stream_fcn
         stream_one_model = models.names[stream_one_fcn]
 
-        self.key_stream_one = stream_one_model(self.in_shape, self.output_dim, self.cfg, self.device, self.preprocess)
-        self.query_stream_one = stream_one_model(self.kernel_shape, self.kernel_dim, self.cfg, self.device, self.preprocess)
+        self.key_stream_one = stream_one_model(self.in_shape, self.output_dim, self.cfg, self.device, self.preprocess).cuda()
+        self.query_stream_one = stream_one_model(self.kernel_shape, self.kernel_dim, self.cfg, self.device, self.preprocess).cuda()
 
         print(f"Transport FCN: {stream_one_fcn}")
 
