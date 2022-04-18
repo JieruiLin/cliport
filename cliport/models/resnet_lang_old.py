@@ -25,21 +25,42 @@ class ResNet43_8s_lang(nn.Module):
     def _make_layers(self):
         self.conv1 = nn.Sequential(
             # conv1
-            nn.Conv2d(self.input_dim, 64, stride=2, kernel_size=3, padding=1),
+            nn.Conv2d(self.input_dim, 64, stride=1, kernel_size=3, padding=1),
             nn.BatchNorm2d(64) if self.batchnorm else nn.Identity(),
             nn.ReLU(True),
-            # conv1
-            nn.Conv2d(64, 128, stride=2, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128) if self.batchnorm else nn.Identity(),
-            nn.ReLU(True),          
+
+            # fcn
+            ConvBlock(64, [64, 64, 64], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+            IdentityBlock(64, [64, 64, 64], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+
+            ConvBlock(64, [128, 128, 128], kernel_size=3, stride=2, batchnorm=self.batchnorm),
+            IdentityBlock(128, [128, 128, 128], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+
+            ConvBlock(128, [256, 256, 256], kernel_size=3, stride=2, batchnorm=self.batchnorm),
+            IdentityBlock(256, [256, 256, 256], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+
+            ConvBlock(256, [512, 512, 512], kernel_size=3, stride=2, batchnorm=self.batchnorm),
+            IdentityBlock(512, [512, 512, 512], kernel_size=3, stride=1, batchnorm=self.batchnorm),
         )
 
 
         # decoders
         self.decoder1 = nn.Sequential(
+            ConvBlock(512, [256, 256, 256], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+            IdentityBlock(256, [256, 256, 256], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+        )
+
+        self.decoder2 = nn.Sequential(
+            ConvBlock(256, [128, 128, 128], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+            IdentityBlock(128, [128, 128, 128], kernel_size=3, stride=1, batchnorm=self.batchnorm),
+            nn.UpsamplingBilinear2d(scale_factor=2),
+        )
+
+        self.decoder3 = nn.Sequential(
             ConvBlock(128, [64, 64, 64], kernel_size=3, stride=1, batchnorm=self.batchnorm),
             IdentityBlock(64, [64, 64, 64], kernel_size=3, stride=1, batchnorm=self.batchnorm),
-            nn.UpsamplingBilinear2d(scale_factor=4),
+            nn.UpsamplingBilinear2d(scale_factor=2),
         )
 
         self.conv2 = nn.Sequential(
@@ -55,10 +76,13 @@ class ResNet43_8s_lang(nn.Module):
         self.text_fc = nn.Linear(768, 1024)
 
         self.lang_fuser1 = fusion.names[self.lang_fusion_type](input_dim=self.input_dim // 2)
+        self.lang_fuser2 = fusion.names[self.lang_fusion_type](input_dim=self.input_dim // 4)
+        self.lang_fuser3 = fusion.names[self.lang_fusion_type](input_dim=self.input_dim // 8)
 
         self.proj_input_dim = 512 if 'word' in self.lang_fusion_type else 1024
-        self.lang_proj1 = nn.Linear(self.proj_input_dim, 128)
-
+        self.lang_proj1 = nn.Linear(self.proj_input_dim, 512)
+        self.lang_proj2 = nn.Linear(self.proj_input_dim, 256)
+        self.lang_proj3 = nn.Linear(self.proj_input_dim, 128)
 
     def encode_text(self, l):
         with torch.no_grad():
@@ -71,6 +95,8 @@ class ResNet43_8s_lang(nn.Module):
         return text_feat, text_embeddings.last_hidden_state, text_mask
 
     def forward(self, x, l):
+        import pdb 
+        pdb.set_trace()
         x = self.preprocess(x, dist='transporter')
 
         # encode language
@@ -82,6 +108,12 @@ class ResNet43_8s_lang(nn.Module):
 
         x = self.lang_fuser1(x, l_input, x2_mask=l_mask, x2_proj=self.lang_proj1)
         x = self.decoder1(x)
+
+        x = self.lang_fuser2(x, l_input, x2_mask=l_mask, x2_proj=self.lang_proj2)
+        x = self.decoder2(x)
+
+        x = self.lang_fuser3(x, l_input, x2_mask=l_mask, x2_proj=self.lang_proj3)
+        x = self.decoder3(x)
 
         out = self.conv2(x)
 

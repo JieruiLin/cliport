@@ -205,6 +205,7 @@ class Environment(gym.Env):
           (obs, reward, done, info) tuple containing MDP step data.
         """
         if action is not None:
+            # execute scripted policy (e.g. pick-and-place, push, etc.)
             timeout = self.task.primitive(self.movej, self.movep, self.ee, action['pose0'], action['pose1'])
 
             # Exit early if action times out. We still return an observation

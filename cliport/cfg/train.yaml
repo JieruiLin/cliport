@@ -36,7 +36,7 @@ train:
   lang_fusion_type: 'mult'
 
   # script configs
-  gpu: [0] # -1 for all
+  gpu: [1] # -1 for all
   log: False # log metrics and stats to wandb
   n_val: 100
   val_repeats: 1

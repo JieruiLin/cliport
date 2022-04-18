@@ -179,7 +179,6 @@ class TransporterAgent(LightningModule):
         self.transport.train()
 
         frame, _ = batch
-
         # Get training losses.
         step = self.total_steps + 1
         loss0, err0 = self.attn_training_step(frame)
