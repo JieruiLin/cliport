@@ -17,6 +17,8 @@ class AttentionImageGoal(Attention):
     def forward(self, inp_img, goal_img, softmax=True):
         """Forward pass."""
         # Input image.
+        import pdb
+        pdb.set_trace()
         in_data = np.pad(inp_img, self.padding, mode='constant')
         in_shape = (1,) + in_data.shape
         in_data = in_data.reshape(in_shape)

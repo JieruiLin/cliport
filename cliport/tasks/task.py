@@ -63,7 +63,6 @@ class Task():
 
         def act(obs, info):  # pylint: disable=unused-argument
             """Calculate action."""
-
             # Oracle uses perfect RGB-D orthographic images and segmentation masks.
             _, hmap, obj_mask = self.get_true_image(env)
 

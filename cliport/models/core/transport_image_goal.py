@@ -52,9 +52,9 @@ class TransportImageGoal(nn.Module):
     def _build_nets(self):
         stream_one_fcn, _ = self.stream_fcn
         model = models.names[stream_one_fcn]
-        self.key_resnet = model(self.in_shape, self.output_dim, self.cfg, self.device)
-        self.query_resnet = model(self.in_shape, self.kernel_dim, self.cfg, self.device)
-        self.goal_resnet = model(self.in_shape, self.output_dim, self.cfg, self.device)
+        self.key_resnet = model(self.in_shape, self.output_dim, self.cfg, self.device, preprocess=utils.preprocess)
+        self.query_resnet = model(self.in_shape, self.kernel_dim, self.cfg, self.device, preprocess=utils.preprocess)
+        self.goal_resnet = model(self.in_shape, self.output_dim, self.cfg, self.device, preprocess=utils.preprocess)
         print(f"Transport FCN: {stream_one_fcn}")
 
     def correlate(self, in0, in1, softmax):

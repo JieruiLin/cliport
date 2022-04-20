@@ -105,7 +105,7 @@ class RavensDataset(Dataset):
         """Limit random samples to specific fixed set."""
         self.sample_set = episodes
 
-    '''
+
     def load(self, episode_id, images=True, cache=False):
         def load_field(episode_id, field, fname):
 
@@ -137,46 +137,18 @@ class RavensDataset(Dataset):
                 action = load_field(episode_id, 'action', fname)
                 reward = load_field(episode_id, 'reward', fname)
                 info = load_field(episode_id, 'info', fname)
+                try:
+                    embedding = load_field(episode_id, 'embedding', fname)
+                except FileNotFoundError:
+                    embedding = np.zeros((1,1))
 
                 # Reconstruct episode.
                 episode = []
                 for i in range(len(action)):
                     obs = {'color': color[i], 'depth': depth[i]} if images else {}
-                    episode.append((obs, action[i], reward[i], info[i]))
+                    episode.append((obs, action[i], reward[i], info[i], embedding))
                 return episode, seed
-    '''
-
-    def load(self, episode_id, images=True, cache=False):
-        def load_field(episode_id, field, fname):
-
-            # Check if sample is in cache.
-            if cache:
-                if episode_id in self._cache:
-                    if field in self._cache[episode_id]:
-                        return self._cache[episode_id][field]
-                else:
-                    self._cache[episode_id] = {}
-
-            # Load sample from files.
-            path = os.path.join(self._path, field)
-            data = pickle.load(open(os.path.join(path, fname), 'rb'))
-            if cache:
-                self._cache[episode_id][field] = data
-            return data
-
-        # Get filename and random seed used to initialize episode.
-        seed = None
-        path = os.path.join(self._path, 'action')
-        for fname in sorted(os.listdir(path)):
-            if f'{episode_id:06d}' in fname:
-                seed = int(fname[(fname.find('-') + 1):-4])
-
-                # add for forward training
-                episode = load_field(episode_id, 'embedding', fname)
-
-                # Reconstruct episode.
-                return episode, seed
-
+    
     def get_image(self, obs, cam_config=None):
         """Stack color and height images image."""
 
@@ -201,7 +173,7 @@ class RavensDataset(Dataset):
 
     def process_sample(self, datum, augment=True):
         # Get training labels from data sample.
-        (obs, act, _, info) = datum
+        (obs, act, _, info, embedding) = datum
         img = self.get_image(obs)
 
         p0, p1 = None, None
@@ -242,7 +214,7 @@ class RavensDataset(Dataset):
 
     def process_goal(self, goal, perturb_params):
         # Get goal sample.
-        (obs, act, _, info) = goal
+        (obs, act, _, info, embedding) = goal
         img = self.get_image(obs)
 
         p0, p1 = None, None
@@ -273,8 +245,7 @@ class RavensDataset(Dataset):
     def __len__(self):
         #return len(self.sample_set)
         return self.n_episodes
-
-    '''
+    
     def __getitem__(self, idx):
         # Choose random episode.
         if len(self.sample_set) > 0:
@@ -292,25 +263,13 @@ class RavensDataset(Dataset):
         sample, goal = episode[i], episode[g]
 
         # Process sample.
-        sample = self.process_sample(sample, augment=self.augment)
-        goal = self.process_goal(goal, perturb_params=sample['perturb_params'])
+        #sample = self.process_sample(sample, augment=self.augment)
+        #goal = self.process_goal(goal, perturb_params=sample['perturb_params'])
 
-        return sample, goal
-    '''
-
-    def __getitem__(self, idx):
-        # Choose random episode.
-        if len(self.sample_set) > 0:
-            episode_id = np.random.choice(self.sample_set)
-        else:
-            episode_id = np.random.choice(range(self.n_episodes))
-        episode, _ = self.load(episode_id, self.images, self.cache)
-        episode = np.float32(episode)
-        # Is the task sequential like stack-block-pyramid-seq?
-        is_sequential_task = '-seq' in self._path.split("/")[-1]
-        
-        return episode[0, :512], episode[0, 512:1024], episode[0, 1024:]
-
+        #return sample, goal
+        obs_init, _, _, _, embedding =  sample
+        obs_goal, _, _, _, _ = goal
+        return obs_init['color'][0], obs_goal['color'][0], embedding[0][-512:]
 
 class RavensMultiTaskDataset(RavensDataset):
 

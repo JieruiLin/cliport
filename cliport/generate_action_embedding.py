@@ -27,7 +27,7 @@ for fname in sorted(os.listdir(info_path)):
     pre_image = images[0][0]
     post_image = images[1][0]
     lang_goal = info[0]['lang_goal']
-    token = clip.tokenize(lang_goal).to(device)#
+    token = clip.tokenize(lang_goal).to(device)
 
     with torch.no_grad():
         pre_image = preprocess(Image.fromarray(np.uint8(pre_image))).unsqueeze(0).to(device)

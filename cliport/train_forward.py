@@ -17,6 +17,8 @@ from cliport.environments.environment import Environment
 import wandb
 from tqdm import tqdm
 
+from cliport.models.resnet import ConvBlock, IdentityBlock
+
 mode = 'train'
 augment = True
 task = 'packing-shapes'
@@ -31,15 +33,54 @@ cfg['mode'] = mode
 
 data_dir = os.path.join(root_dir, 'data')
 train_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, augment=augment)
-train_data_loader = DataLoader(train_dataset, batch_size=256)
+train_data_loader = DataLoader(train_dataset, batch_size=2)
 test_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-test'), cfg, augment=None)
-test_data_loader = DataLoader(test_dataset, batch_size=100)
+test_data_loader = DataLoader(test_dataset, batch_size=2)
+
+
+
 
 class ICMModel(nn.Module):
     def __init__(self, use_cuda=True):
         super(ICMModel, self).__init__()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
+        feature_output = 6 * 9 * 64
+        self.feature = nn.Sequential(
+            nn.Conv2d(
+                in_channels=3,
+                out_channels=32,
+                kernel_size=8,
+                stride=4),
+            nn.LeakyReLU(),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=32,
+                kernel_size=6,
+                stride=3),
+            nn.LeakyReLU(),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=4,
+                stride=2),
+            nn.LeakyReLU(),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=4,
+                stride=2),
+            nn.LeakyReLU(),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=3,
+                stride=1),
+            nn.LeakyReLU(),
+            nn.Flatten(),
+            nn.Linear(feature_output, 512)
+        )
 
+        '''
         self.feature = nn.Sequential(
             nn.Linear(512, 512),
             nn.LeakyReLU(),
@@ -47,7 +88,8 @@ class ICMModel(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(512, 512)
         )
-
+        '''
+        
         self.inverse_net = nn.Sequential(
             nn.Linear(512 * 2, 512),
             nn.ReLU(),
@@ -110,8 +152,8 @@ def train_or_val(flag, data_loader):
 
     for batch_idx, sample in enumerate(data_loader):
         state, next_state, action = sample
-        state = state.cuda()
-        next_state = next_state.cuda()
+        state = state.cuda().permute(0,3,1,2)/255.
+        next_state = next_state.cuda().permute(0,3,1,2)/255.
         action = action.cuda()
         real_next_state_feature, pred_next_state_feature, pred_action = model(state, next_state, action)
         forward_loss = mse(pred_next_state_feature, real_next_state_feature.detach())
@@ -120,7 +162,7 @@ def train_or_val(flag, data_loader):
             loss = forward_loss + inverse_loss
             optimizer.zero_grad()
             loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
     return forward_loss, inverse_loss
 

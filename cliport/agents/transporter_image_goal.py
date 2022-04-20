@@ -67,6 +67,8 @@ class ImageGoalTransporterAgent(OriginalTransporterAgent):
         return loss, err
 
     def training_step(self, batch, batch_idx):
+        import pdb 
+        pdb.set_trace()
         self.attention.train()
         self.transport.train()
 
