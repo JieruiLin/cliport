@@ -266,7 +266,11 @@ class Task():
             if diff_rot > (symmetry / 2):
                 diff_rot = symmetry - diff_rot
 
-        return (dist_pos < self.pos_eps) and (diff_rot < self.rot_eps)
+        # hack to not using rotation to judge the success of putting in a bowl
+        if self._rewards > 4/7:
+            return (dist_pos < self.pos_eps)
+        else:
+            return (dist_pos < self.pos_eps) and (diff_rot < self.rot_eps)
 
     def get_true_image(self, env):
         """Get RGB-D orthographic heightmaps and segmentation masks."""

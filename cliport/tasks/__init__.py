@@ -42,6 +42,7 @@ from cliport.tasks.towers_of_hanoi_seq import TowersOfHanoiSeqUnseenColors
 from cliport.tasks.towers_of_hanoi_seq import TowersOfHanoiSeqFull
 
 from cliport.tasks.packing_and_stacking import PackingAndStacking
+from cliport.tasks.packing_stacking_putting_same_objects import PackingStackingPuttingSameObjects
 
 names = {
     # demo conditioned
@@ -87,4 +88,5 @@ names = {
     'towers-of-hanoi-seq-unseen-colors': TowersOfHanoiSeqUnseenColors,
     'towers-of-hanoi-seq-full': TowersOfHanoiSeqFull,
     'packing-and-stacking': PackingAndStacking,
+    'packing-stacking-putting-same-objects': PackingStackingPuttingSameObjects,
 }
