@@ -11,7 +11,7 @@ from torch.nn import init
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from cliport import agents
-from cliport.dataset import RavensDataset, RavensMultiTaskDataset
+from cliport.dataset import ForwardDataset
 from cliport.utils import utils
 from cliport.environments.environment import Environment
 import wandb
@@ -32,12 +32,10 @@ cfg['task'] = task
 cfg['mode'] = mode
 
 data_dir = os.path.join(root_dir, 'data')
-train_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, augment=None)
+train_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=None)
 train_data_loader = DataLoader(train_dataset, batch_size=128)
-test_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, augment=None)
+test_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=100, augment=None)
 test_data_loader = DataLoader(test_dataset, batch_size=64)
-
-
 
 
 class ICMModel(nn.Module):
