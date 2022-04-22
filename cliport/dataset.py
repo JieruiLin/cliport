@@ -146,7 +146,10 @@ class RavensDataset(Dataset):
                 episode = []
                 for i in range(len(action)):
                     obs = {'color': color[i], 'depth': depth[i]} if images else {}
-                    episode.append((obs, action[i], reward[i], info[i], embedding))
+                    if i == len(action) - 1:
+                        episode.append((obs, action[i], reward[i], info[i], embedding[i-1]))
+                    else:
+                        episode.append((obs, action[i], reward[i], info[i], embedding[i]))
                 return episode, seed
     
     def get_image(self, obs, cam_config=None):
@@ -255,21 +258,24 @@ class RavensDataset(Dataset):
         episode, _ = self.load(episode_id, self.images, self.cache)
 
         # Is the task sequential like stack-block-pyramid-seq?
-        is_sequential_task = '-seq' in self._path.split("/")[-1]
-
+        is_sequential_task = True
+        get_valid_transition = False
         # Return random observation action pair (and goal) from episode.
-        i = np.random.choice(range(len(episode)-1))
-        g = i+1 if is_sequential_task else -1
-        sample, goal = episode[i], episode[g]
+        # loop until the action is successful
+        while not get_valid_transition:
+            i = np.random.choice(range(len(episode)-1))
+            g = i+1 if is_sequential_task else -1
+            sample, goal = episode[i], episode[g]
+            _, _, _, _, embedding = sample
+            _, _, reward, _, _ = goal
+            if reward > 0:
+                get_valid_transition = True
 
         # Process sample.
-        #sample = self.process_sample(sample, augment=self.augment)
-        #goal = self.process_goal(goal, perturb_params=sample['perturb_params'])
+        sample = self.process_sample(sample, augment=None)
+        goal = self.process_sample(goal, augment=None)
 
-        #return sample, goal
-        obs_init, _, _, _, embedding =  sample
-        obs_goal, _, _, _, _ = goal
-        return obs_init['color'][0], obs_goal['color'][0], embedding[0][-512:]
+        return sample['img'][:,:,:3], goal['img'][:,:,:3], embedding
 
 class RavensMultiTaskDataset(RavensDataset):
 

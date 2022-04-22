@@ -21,7 +21,7 @@ from cliport.models.resnet import ConvBlock, IdentityBlock
 
 mode = 'train'
 augment = True
-task = 'packing-shapes'
+task = 'packing-stacking-putting-same-objects'
 # Load configs
 root_dir = os.environ['CLIPORT_ROOT']
 config_file = 'train.yaml' 
@@ -32,10 +32,10 @@ cfg['task'] = task
 cfg['mode'] = mode
 
 data_dir = os.path.join(root_dir, 'data')
-train_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, augment=augment)
-train_data_loader = DataLoader(train_dataset, batch_size=2)
-test_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-test'), cfg, augment=None)
-test_data_loader = DataLoader(test_dataset, batch_size=2)
+train_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, augment=None)
+train_data_loader = DataLoader(train_dataset, batch_size=128)
+test_dataset = RavensDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, augment=None)
+test_data_loader = DataLoader(test_dataset, batch_size=64)
 
 
 
@@ -44,19 +44,13 @@ class ICMModel(nn.Module):
     def __init__(self, use_cuda=True):
         super(ICMModel, self).__init__()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
-        feature_output = 6 * 9 * 64
+        feature_output = 16 * 6 * 64
         self.feature = nn.Sequential(
             nn.Conv2d(
                 in_channels=3,
                 out_channels=32,
                 kernel_size=8,
                 stride=4),
-            nn.LeakyReLU(),
-            nn.Conv2d(
-                in_channels=32,
-                out_channels=32,
-                kernel_size=6,
-                stride=3),
             nn.LeakyReLU(),
             nn.Conv2d(
                 in_channels=32,
@@ -111,6 +105,10 @@ class ICMModel(nn.Module):
         )
 
         for p in self.modules():
+            if isinstance(p, nn.Conv2d):
+                init.kaiming_uniform_(p.weight)
+                p.bias.data.zero_()
+
             if isinstance(p, nn.Linear):
                 init.kaiming_uniform_(p.weight, a=1.0)
                 p.bias.data.zero_()
@@ -150,11 +148,11 @@ def train_or_val(flag, data_loader):
     else:
         model.eval()
 
-    for batch_idx, sample in enumerate(data_loader):
+    for batch_idx, sample in enumerate(tqdm(data_loader)):
         state, next_state, action = sample
-        state = state.cuda().permute(0,3,1,2)/255.
-        next_state = next_state.cuda().permute(0,3,1,2)/255.
-        action = action.cuda()
+        state = state.cuda().float().permute(0,3,1,2)/255.
+        next_state = next_state.cuda().float().permute(0,3,1,2)/255.
+        action = action.float().cuda()
         real_next_state_feature, pred_next_state_feature, pred_action = model(state, next_state, action)
         forward_loss = mse(pred_next_state_feature, real_next_state_feature.detach())
         inverse_loss = mse(pred_action, action)
@@ -166,7 +164,9 @@ def train_or_val(flag, data_loader):
             optimizer.step()
     return forward_loss, inverse_loss
 
-for epoch in tqdm(range(1000)):
+for epoch in tqdm(range(100)):
+    print()
+    print("Epoch: ", epoch)
     # train
     forward_loss_train, inverse_loss_train = train_or_val('train', train_data_loader)
     # eval
@@ -177,7 +177,7 @@ for epoch in tqdm(range(1000)):
                "forward_loss_val": forward_loss_val.item(),
                "inverse_loss_val": inverse_loss_val.item()})
 
-    if epoch % 100 == 0:
+    if epoch % 10 == 0:
         torch.save(model, "icm_model.pt")
         
     # evaluate 
