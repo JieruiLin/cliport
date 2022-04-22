@@ -52,6 +52,8 @@ class PackingStackingPuttingSameObjects(Task):
         env.add_object(base_urdf, base_pose, 'fixed')
         
         # Block colors.
+        import pdb 
+        pdb.set_trace()
         color_names = self.get_colors()
         # Shuffle the block colors.
         random.shuffle(color_names)

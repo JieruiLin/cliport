@@ -62,7 +62,8 @@ class RavensDataset(Dataset):
             if self.n_demos > self.n_episodes:
                 raise Exception(f"Requested training on {self.n_demos} demos, but only {self.n_episodes} demos exist in the dataset path: {self._path}.")
 
-            episodes = np.random.choice(range(self.n_episodes), self.n_demos, False)
+            # fix index for overfitting exps
+            episodes = np.arange(0,10) #np.random.choice(range(self.n_episodes), self.n_demos, False)
             self.set(episodes)
 
 

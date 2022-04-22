@@ -16,11 +16,13 @@ from cliport.utils import utils
 from cliport.environments.environment import Environment
 import wandb
 from tqdm import tqdm
+import clip
+import numpy as np
 
-from cliport.models.resnet import ConvBlock, IdentityBlock
 
 mode = 'train'
 augment = True
+TRAIN = True
 task = 'packing-stacking-putting-same-objects'
 # Load configs
 root_dir = os.environ['CLIPORT_ROOT']
@@ -32,10 +34,10 @@ cfg['task'] = task
 cfg['mode'] = mode
 
 data_dir = os.path.join(root_dir, 'data')
-train_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=None)
-train_data_loader = DataLoader(train_dataset, batch_size=128)
-test_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=100, augment=None)
-test_data_loader = DataLoader(test_dataset, batch_size=64)
+train_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=10, augment=None)
+train_data_loader = DataLoader(train_dataset, batch_size=10)
+test_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=10, augment=None)
+test_data_loader = DataLoader(test_dataset, batch_size=10)
 
 
 class ICMModel(nn.Module):
@@ -137,8 +139,63 @@ class ICMModel(nn.Module):
 
 model = ICMModel().cuda()
 mse = nn.MSELoss()
+mse_no_reduction = nn.MSELoss(reduction='none')
 optimizer = optim.Adam(model.parameters(), lr=1e-4)
 wandb.init(project='forward_inverse_model')
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# "ViT-B/32"
+clip_model, preprocess = clip.load("ViT-B/32", device=device)
+
+color_names = ['blue', 'red', 'green', 'yellow', 'brown', 'gray', 'cyan']
+packing_lang_template = "pack the {obj} block in the brown box"
+stacking_lang_template = "stack the {pick} block on {place}"
+put_lang_template = "put the {pick} block in a {place} bowl"
+
+all_languages = []
+for i in range(len(color_names)):
+    all_languages.append(packing_lang_template.format(obj=color_names[i]))
+    all_languages.append(stacking_lang_template.format(pick=color_names[i], place="the lightest brown block"))
+    all_languages.append(stacking_lang_template.format(pick=color_names[i], place="the middle brown block"))
+    for j in range(len(color_names)):
+        if i != j:
+            all_languages.append(put_lang_template.format(pick=color_names[i], place=color_names[j]))
+
+        for k in range(len(color_names)):
+            if i != j and i != k and j != k:
+                all_languages.append(stacking_lang_template.format(pick=color_names[i], place=f"the {color_names[j]} and {color_names[k]} blocks"))
+all_tokens = clip.tokenize(all_languages).to(device)
+all_actions = clip_model.encode_text(all_tokens)
+np.save('/home/jerrylin/temp/cliport/data/action_dictionary.npy', all_actions.detach().cpu().numpy())
+
+def evaluate_inverse_model(ds, model):
+    pred_languages_all_episode = []
+    for i in range(len(ds)):
+        episode, seed = ds.load(i)
+        pred_languages = []
+
+        for step in range(len(episode)-1):
+            state = ds.process_sample(episode[step], augment=None)
+            next_state = ds.process_sample(episode[step + 1], augment=None)
+            image = torch.from_numpy(state['img'])[None,:,:,:3]
+            next_image = torch.from_numpy(next_state['img'])[None,:,:,:3]
+            image = image.cuda().float().permute(0,3,1,2)/255.
+            next_image = next_image.cuda().float().permute(0,3,1,2)/255.
+            # ground-truth lang goal
+            lang_goal = state['lang_goal']
+            with torch.no_grad():
+                encode_state = model.feature(image)
+                encode_next_state = model.feature(next_image)
+                # get pred action
+                pred_action = torch.cat((encode_state, encode_next_state), 1)
+                pred_action = model.inverse_net(pred_action)
+            action_idx = mse_no_reduction(pred_action, all_actions).mean(1).argmax()
+
+            pred_language = all_languages[action_idx]
+            pred_languages.append(pred_language)
+        pred_languages_all_episode.append(pred_languages)
+    return pred_languages_all_episode
+
 
 def train_or_val(flag, data_loader):
     if flag == 'train':
@@ -162,22 +219,28 @@ def train_or_val(flag, data_loader):
             optimizer.step()
     return forward_loss, inverse_loss
 
-for epoch in tqdm(range(100)):
-    print()
-    print("Epoch: ", epoch)
-    # train
-    forward_loss_train, inverse_loss_train = train_or_val('train', train_data_loader)
-    # eval
-    forward_loss_val, inverse_loss_val = train_or_val('val', test_data_loader)
+if TRAIN:
+    for epoch in tqdm(range(100)):
+        print()
+        print("Epoch: ", epoch)
+        # train
+        forward_loss_train, inverse_loss_train = train_or_val('train', train_data_loader)
+        # eval
+        forward_loss_val, inverse_loss_val = train_or_val('val', test_data_loader)
+        pred_languages = evaluate_inverse_model(train_dataset, model)
+        print(pred_languages)
+        wandb.log({"forward_loss_train": forward_loss_train.item(),
+                "inverse_loss_train": inverse_loss_train.item(),
+                "forward_loss_val": forward_loss_val.item(),
+                "inverse_loss_val": inverse_loss_val.item()})
 
-    wandb.log({"forward_loss_train": forward_loss_train.item(),
-               "inverse_loss_train": inverse_loss_train.item(),
-               "forward_loss_val": forward_loss_val.item(),
-               "inverse_loss_val": inverse_loss_val.item()})
-
-    if epoch % 10 == 0:
-        torch.save(model, "icm_model.pt")
+        if epoch % 10 == 0:
+            torch.save(model, "icm_model.pt")
+else:
+    model = torch.load("icm_model.pt")
+    pred_languages = evaluate_inverse_model(train_dataset, model)
+    print(pred_languages)
         
-    # evaluate 
-    # compose a sequence of different actions: different verbs/tasks, different nouns/pbjects. Use inverse model to segment the sequence.
-    # image-goal vs. no-goal vs. lang-goal vs. (oracle) image-goal
+# evaluate 
+# compose a sequence of different actions: different verbs/tasks, different nouns/pbjects. Use inverse model to segment the sequence.
+# image-goal vs. no-goal vs. lang-goal vs. (oracle) image-goal
