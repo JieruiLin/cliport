@@ -22,7 +22,7 @@ import numpy as np
 
 mode = 'train'
 augment = True
-TRAIN = True
+TRAIN = False
 task = 'packing-stacking-putting-same-objects'
 # Load configs
 root_dir = os.environ['CLIPORT_ROOT']
@@ -35,7 +35,7 @@ cfg['mode'] = mode
 
 data_dir = os.path.join(root_dir, 'data')
 train_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=None)
-train_data_loader = DataLoader(train_dataset, batch_size=64)
+train_data_loader = DataLoader(train_dataset, batch_size=2)
 test_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=100, augment=None)
 test_data_loader = DataLoader(test_dataset, batch_size=64)
 
@@ -91,6 +91,7 @@ class ICMModel(nn.Module):
                 p.bias.data.zero_()
 
     def forward(self, state, next_state, action):
+        print(state.shape)
         encode_state = self.feature(state)
         encode_next_state = self.feature(next_state)
         # get pred action
@@ -108,13 +109,13 @@ optimizer = optim.Adam(model.parameters(), lr=1e-4)
 wandb.init(project='forward_inverse_model')
 
 all_languages = ['pack', 'stack', 'put'] #np.load("/home/jerrylin/temp/cliport/data/language_dictionary.npy")
-all_actions = np.load("/home/jerrylin/temp/cliport/data/action_dictionary.npy")
+all_actions = np.load("/home/huihanl/cliport/data/action_dictionary.npy")
 
 def evaluate_inverse_model(ds, model):
     pred_languages_all_episode = []
     total = 0
     correct = 0
-    for i in range(10):
+    for i in range(50):
         episode, seed = ds.load(i)
         pred_languages = []
 
@@ -133,6 +134,7 @@ def evaluate_inverse_model(ds, model):
                 cls = 1
             else:
                 cls = 2
+
             with torch.no_grad():
                 encode_state = model.feature(image)
                 encode_next_state = model.feature(next_image)
@@ -158,8 +160,8 @@ def train_or_val(flag, data_loader):
 
     for batch_idx, sample in enumerate(tqdm(data_loader)):
         state, next_state, action = sample
-        state = state.cuda().float().permute(0,3,1,2)/255.
-        next_state = next_state.cuda().float().permute(0,3,1,2)/255.
+        state = state[:,:,:,:3].cuda().float().permute(0,3,1,2)/255.
+        next_state = next_state[:,:,:,:3].cuda().float().permute(0,3,1,2)/255.
         action = action.long().cuda()
         pred_action = model(state, next_state, action)
         inverse_loss = ce(pred_action, action)
@@ -188,9 +190,11 @@ if TRAIN:
         if epoch % 10 == 0:
             torch.save(model, "icm_model.pt")
 else:
-    pred_languages, accuracy = evaluate_inverse_model(train_dataset, model)
+    model = torch.load("icm_model.pt")
+    pred_languages, accuracy = evaluate_inverse_model(test_dataset, model)
     print(accuracy)
     print(pred_languages)
+    print(len(pred_languages))
 
         
 # evaluate 
