@@ -63,7 +63,7 @@ class RavensDataset(Dataset):
                 raise Exception(f"Requested training on {self.n_demos} demos, but only {self.n_episodes} demos exist in the dataset path: {self._path}.")
 
             # fix index for overfitting exps
-            episodes = np.arange(0,10) #np.random.choice(range(self.n_episodes), self.n_demos, False)
+            episodes = np.random.choice(range(self.n_episodes), self.n_demos, False)
             self.set(episodes)
 
 
@@ -303,6 +303,43 @@ class ForwardDataset(RavensDataset):
         goal = self.process_sample(goal, augment=None)
 
         return sample['img'][:,:,:3], goal['img'][:,:,:3], embedding
+
+class ForwardDatasetClassification(RavensDataset):
+    def __init__(self, path, cfg, n_demos=0, augment=False):
+        super().__init__(path, cfg, n_demos, augment)
+
+    def __getitem__(self, idx):
+        # Choose random episode.
+        if len(self.sample_set) > 0:
+            episode_id = np.random.choice(self.sample_set)
+        else:
+            episode_id = np.random.choice(range(self.n_episodes))
+        episode, _ = self.load(episode_id, self.images, self.cache)
+
+        # Is the task sequential like stack-block-pyramid-seq?
+        is_sequential_task = True
+        get_valid_transition = False
+        # Return random observation action pair (and goal) from episode.
+        # loop until the action is successful
+        while not get_valid_transition:
+            i = np.random.choice(range(len(episode)-1))
+            g = i+1 if is_sequential_task else -1
+            sample, goal = episode[i], episode[g]
+            _, _, _, _, embedding = sample
+            _, _, reward, _, _ = goal
+            if reward > 0:
+                get_valid_transition = True
+
+        # Process sample.
+        sample = self.process_sample(sample, augment=None)
+        goal = self.process_sample(goal, augment=None)
+        if sample['lang_goal'].split()[0] == 'pack':
+            cls = 0
+        elif sample['lang_goal'].split()[0] == 'stack':
+            cls = 1
+        else:
+            cls = 2
+        return sample['img'], goal['img'], cls
 
 class RavensMultiTaskDataset(RavensDataset):
 

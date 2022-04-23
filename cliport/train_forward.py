@@ -34,10 +34,10 @@ cfg['task'] = task
 cfg['mode'] = mode
 
 data_dir = os.path.join(root_dir, 'data')
-train_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=10, augment=None)
-train_data_loader = DataLoader(train_dataset, batch_size=10)
-test_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=10, augment=None)
-test_data_loader = DataLoader(test_dataset, batch_size=10)
+train_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=2, augment=None)
+train_data_loader = DataLoader(train_dataset, batch_size=2)
+test_dataset = ForwardDataset(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=2, augment=None)
+test_data_loader = DataLoader(test_dataset, batch_size=2)
 
 
 class ICMModel(nn.Module):
@@ -164,8 +164,10 @@ for i in range(len(color_names)):
         for k in range(len(color_names)):
             if i != j and i != k and j != k:
                 all_languages.append(stacking_lang_template.format(pick=color_names[i], place=f"the {color_names[j]} and {color_names[k]} blocks"))
+
 all_tokens = clip.tokenize(all_languages).to(device)
 all_actions = clip_model.encode_text(all_tokens)
+np.save('/home/jerrylin/temp/cliport/data/language_dictionary.npy', all_languages)
 np.save('/home/jerrylin/temp/cliport/data/action_dictionary.npy', all_actions.detach().cpu().numpy())
 
 def evaluate_inverse_model(ds, model):
@@ -189,7 +191,7 @@ def evaluate_inverse_model(ds, model):
                 # get pred action
                 pred_action = torch.cat((encode_state, encode_next_state), 1)
                 pred_action = model.inverse_net(pred_action)
-            action_idx = mse_no_reduction(pred_action, all_actions).mean(1).argmax()
+            action_idx = mse_no_reduction(pred_action, all_actions).mean(1).argmin()
 
             pred_language = all_languages[action_idx]
             pred_languages.append(pred_language)
@@ -215,7 +217,7 @@ def train_or_val(flag, data_loader):
             loss = forward_loss + inverse_loss
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
     return forward_loss, inverse_loss
 
