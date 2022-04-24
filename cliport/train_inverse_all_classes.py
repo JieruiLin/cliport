@@ -19,7 +19,7 @@ from tqdm import tqdm
 import clip
 import numpy as np
 import torchvision.models as models
-
+import time
 
 mode = 'train'
 augment = True
@@ -36,6 +36,7 @@ cfg['mode'] = mode
 
 import sys
 BATCH_SIZE = int(sys.argv[1])
+LR = float(sys.argv[2])
 
 data_dir = os.path.join(root_dir, 'data')
 train_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=None)
@@ -44,8 +45,8 @@ train_data_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
 test_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=100, augment=None)
 test_data_loader = DataLoader(test_dataset, batch_size=8)
 
-all_languages = np.load("/home/jerrylin/temp/cliport/data/language_dictionary.npy")
-all_actions = np.load("/home/jerrylin/temp/cliport/data/action_dictionary.npy")
+all_languages = np.load(data_dir + "/language_dictionary.npy")
+all_actions = np.load(data_dir + "/action_dictionary.npy")
 
 class ICMModel(nn.Module):
     def __init__(self, use_cuda=True):
@@ -79,9 +80,21 @@ model = ICMModel().cuda()
 mse = nn.MSELoss()
 mse_no_reduction = nn.MSELoss(reduction='none')
 ce = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=LR)
 wandb.init(project='forward_inverse_model')
-wandb.config.update({"batch_size": BATCH_SIZE})
+wandb.config.update({"batch_size": BATCH_SIZE,
+                     "lr": LR})
+
+exp_name = "bs-{}_lr-{}".format(BATCH_SIZE, LR) 
+log_dir = '{}-{}'.format(time.strftime("%y-%m-%d-%H-%M-%S"), exp_name)
+base_dir = "/mnt/data1/huihanl"
+
+final_path = os.path.join(base_dir, log_dir)
+if not os.path.exists(final_path):
+    from pathlib import Path
+    path = Path(final_path)
+    path.mkdir(parents=True, exist_ok=True)
+
 def evaluate_inverse_model(ds, model):
     pred_languages_all_episode = []
     total = 0
@@ -166,7 +179,9 @@ if TRAIN:
                    "accuracy_test": accuracy_test})
         
         if epoch % 10 == 0:
-            torch.save(model, "icm_model_all_classes_with_object_classes_bs{}_{}.pt".format(BATCH_SIZE, epoch))
+            torch.save(model, 
+                    os.path.join(final_path, "icm_model_all_classes_with_object_classes_{}.pt".format(epoch)))
+
 else:
     pred_languages, accuracy = evaluate_inverse_model(train_dataset, model)
     print(accuracy)
