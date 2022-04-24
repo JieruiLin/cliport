@@ -68,7 +68,6 @@ class ClassifyAction(nn.Module):
                 p.bias.data.zero_()
 
     def forward(self, state, next_state, action):
-        print(state.shape)
         encode_state = self.feature(state)
         encode_next_state = self.feature(next_state)
         # get pred action
