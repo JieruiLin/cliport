@@ -302,7 +302,7 @@ class ForwardDataset(RavensDataset):
         sample = self.process_sample(sample, augment=None)
         goal = self.process_sample(goal, augment=None)
 
-        return sample['img'][:,:,:3], goal['img'][:,:,:3], embedding
+        return sample['img'], goal['img'], embedding
 
 class ForwardDatasetClassification(RavensDataset):
     def __init__(self, path, cfg, n_demos=0, augment=False):
@@ -325,7 +325,7 @@ class ForwardDatasetClassification(RavensDataset):
             i = np.random.choice(range(len(episode)-1))
             g = i+1 if is_sequential_task else -1
             sample, goal = episode[i], episode[g]
-            _, _, _, _, embedding = sample
+            _, _, _, info, embedding = sample
             _, _, reward, _, _ = goal
             if reward > 0:
                 get_valid_transition = True
@@ -339,6 +339,39 @@ class ForwardDatasetClassification(RavensDataset):
             cls = 1
         else:
             cls = 2
+        return sample['img'], goal['img'], cls
+
+class ForwardDatasetClassificationAllObjects(RavensDataset):
+    def __init__(self, path, cfg, n_demos=0, augment=False):
+        super().__init__(path, cfg, n_demos, augment)
+        self.all_languages = np.load('/home/jerrylin/temp/cliport/data/language_dictionary.npy')
+
+    def __getitem__(self, idx):
+        # Choose random episode.
+        if len(self.sample_set) > 0:
+            episode_id = np.random.choice(self.sample_set)
+        else:
+            episode_id = np.random.choice(range(self.n_episodes))
+        episode, _ = self.load(episode_id, self.images, self.cache)
+
+        # Is the task sequential like stack-block-pyramid-seq?
+        is_sequential_task = True
+        get_valid_transition = False
+        # Return random observation action pair (and goal) from episode.
+        # loop until the action is successful
+        while not get_valid_transition:
+            i = np.random.choice(range(len(episode)-1))
+            g = i+1 if is_sequential_task else -1
+            sample, goal = episode[i], episode[g]
+            _, _, _, info, embedding = sample
+            _, _, reward, _, _ = goal
+            if reward > 0:
+                get_valid_transition = True
+
+        # Process sample.
+        sample = self.process_sample(sample, augment=None)
+        goal = self.process_sample(goal, augment=None)
+        cls = np.where(self.all_languages == sample['lang_goal'])[0][0]
         return sample['img'], goal['img'], cls
 
 class RavensMultiTaskDataset(RavensDataset):
