@@ -35,10 +35,12 @@ cfg['mode'] = mode
 
 import sys
 variant = {
-    "BATCH_SIZE": int(sys.argv[1]),
-    "LR": float(sys.argv[2]),
-    "AUGMENT": eval(sys.argv[3])
+    "batch_size": int(sys.argv[1]),
+    "lr": float(sys.argv[2]),
+    "data_aug": eval(sys.argv[3])
 }
+
+policy_ckpt = sys.argv[4]
 
 data_dir = os.path.join(root_dir, 'data')
 train_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=variant["AUGMENT"])
@@ -78,7 +80,9 @@ class ICMModel(nn.Module):
         return pred_action
 
 
-model = ICMModel().cuda()
+#model = ICMModel().cuda()
+model = torch.load(policy_ckpt)
+
 mse = nn.MSELoss()
 mse_no_reduction = nn.MSELoss(reduction='none')
 ce = nn.CrossEntropyLoss()
@@ -86,11 +90,12 @@ optimizer = optim.Adam(model.parameters(), lr=variant["LR"])
 wandb.init(project='forward_inverse_model')
 
 wandb.config.update({"exp_name": "all_classes",
-                     "batch_size": BATCH_SIZE,
-                     "lr": LR,
-                     "data_aug": AUGMENT})
+                     "batch_size": variant["batch_size"],
+                     "lr": variant["lr"],
+                     "data_aug": variant["data_aug"]
+                     "policy_ckpt": policy_ckpt})
 
-exp_name = "all_classes"
+exp_name = "all_classes-pretrained"
 for (k,v) in variant.items():
     exp_name += "_{}-{}".format(k, v)
 print(exp_name)

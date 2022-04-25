@@ -114,6 +114,7 @@ class ICMModel(nn.Module):
                 p.bias.data.zero_()
 
     def forward(self, state, next_state, action):
+        print(state.shape)
         encode_state = self.feature(state)
         encode_next_state = self.feature(next_state)
         # get pred action
@@ -167,8 +168,8 @@ for i in range(len(color_names)):
 
 all_tokens = clip.tokenize(all_languages).to(device)
 all_actions = clip_model.encode_text(all_tokens)
-np.save('/home/jerrylin/temp/cliport/data/language_dictionary.npy', all_languages)
-np.save('/home/jerrylin/temp/cliport/data/action_dictionary.npy', all_actions.detach().cpu().numpy())
+np.save('/home/huihanl/cliport/data/language_dictionary.npy', all_languages)
+np.save('/home/huihanl/cliport/data/action_dictionary.npy', all_actions.detach().cpu().numpy())
 
 def evaluate_inverse_model(ds, model):
     pred_languages_all_episode = []
