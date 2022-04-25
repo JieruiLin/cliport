@@ -129,13 +129,13 @@ if TRAIN:
         inverse_loss_train, accuracy_train = train_or_val('train', train_data_loader)
         # eval
         inverse_loss_val, accuracy_val = train_or_val('val', test_data_loader)
-        pred_languages, accuracy_test = evaluate_inverse_model(train_dataset, model)
-        print(pred_languages)
+        #pred_languages, accuracy_test = evaluate_inverse_model(train_dataset, model)
+        #print(pred_languages)
         wandb.log({"inverse_loss_train": inverse_loss_train.item(),
                    "inverse_loss_val": inverse_loss_val.item(),
                    "accuracy_train": accuracy_train.item(),
-                   "accuracy_val": accuracy_val.item(),
-                   "accuracy_test": accuracy_test.item()})
+                   "accuracy_val": accuracy_val.item()})
+                   #"accuracy_test": accuracy_test.item()})
 
         if epoch % 10 == 0:
             torch.save(model, "icm_model_action_only_three_classes.pt")
