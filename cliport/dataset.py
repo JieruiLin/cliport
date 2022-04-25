@@ -63,7 +63,8 @@ class RavensDataset(Dataset):
                 raise Exception(f"Requested training on {self.n_demos} demos, but only {self.n_episodes} demos exist in the dataset path: {self._path}.")
 
             # fix index for overfitting exps
-            episodes = np.random.choice(range(self.n_episodes), self.n_demos, False)
+            episodes = np.arange(10)
+            #episodes = np.random.choice(range(self.n_episodes), self.n_demos, False)
             self.set(episodes)
 
 

@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn import init
+from torch.nn import functional as F
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from cliport import agents
@@ -21,6 +22,7 @@ import numpy as np
 import time
 
 from cliport.classifier_models import ICMModel
+from text_encoder import build_text_encoder
 
 mode = 'train'
 augment = True
@@ -54,6 +56,22 @@ def get_loss_function(loss):
         return SupConLoss()
     else:
         raise NotImplementedError("Did not implement loss {}".format(loss))
+
+def get_clip_embeddings(vocabulary, prompt='a '):
+    text_encoder = build_text_encoder(pretrain=True)
+    text_encoder.eval()
+    emb = text_encoder(vocabulary).detach().contiguous().cpu()
+    return emb
+
+def reset_cls_test(model, cls_path):
+    zs_weight = cls_path
+    zs_weight = F.normalize(zs_weight, p=2, dim=0)
+    zs_weight = zs_weight.to(model.device)
+
+    del model.inverse_net[2].weight
+    model.inverse_net[2].weight = zs_weight
+    for param in model.inverse_net[2].parameters():
+        param.requires_grad = False
 
 def evaluate_inverse_model(ds, model):
     pred_languages_all_episode = []
@@ -107,9 +125,9 @@ def train_or_val(flag, data_loader):
         state = state[:,:,:,:3].cuda().float().permute(0,3,1,2)/255.
         next_state = next_state[:,:,:,:3].cuda().float().permute(0,3,1,2)/255.
         action = action.long().cuda()
+
         pred_action = model(state, next_state)
         inverse_loss = ce(pred_action, action)
-
         predicted = torch.argmax(pred_action, 1)
         total += pred_action.shape[0]
         correct += (predicted == action).float().sum()
@@ -131,7 +149,9 @@ test_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"
 test_data_loader = DataLoader(test_dataset, batch_size=2)
 
 model = ICMModel().cuda()
-
+# fix classifier's last layer weights to be clip embeddings
+classifier = get_clip_embeddings(['put', 'stack', 'push'])
+reset_cls_test(model, classifier)
 optimizer = optim.Adam(model.parameters(), lr=LR)
 wandb.init(project='forward_inverse_model')
 wandb.config.update({"exp_name": "3_classes_classification",
