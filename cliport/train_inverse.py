@@ -38,6 +38,7 @@ cfg['mode'] = mode
 import sys
 BATCH_SIZE = int(sys.argv[1])
 LR = float(sys.argv[2])
+AUGMENT = eval(sys.argv[3])
 
 ce = nn.CrossEntropyLoss()
 
@@ -124,20 +125,21 @@ def train_or_val(flag, data_loader):
 
 data_dir = os.path.join(root_dir, 'data')
 
-train_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=500, augment=None)
+train_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=AUGMENT)
 train_data_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
 test_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=100, augment=None)
-test_data_loader = DataLoader(test_dataset, batch_size=8)
+test_data_loader = DataLoader(test_dataset, batch_size=2)
 
 model = ICMModel().cuda()
 
 optimizer = optim.Adam(model.parameters(), lr=LR)
 wandb.init(project='forward_inverse_model')
-wandb.config.update({"exp_name": "classify_3classes",
+wandb.config.update({"exp_name": "3_classes_classification",
                      "batch_size": BATCH_SIZE,
-                     "lr": LR})
+                     "lr": LR,
+                     "data_aug": AUGMENT})
 
-exp_name = "3classes_bs-{}_lr-{}".format(BATCH_SIZE, LR)
+exp_name = "3classes_bs-{}_lr-{}_aug-{}".format(BATCH_SIZE, LR, AUGMENT)
 log_dir = '{}-{}'.format(time.strftime("%y-%m-%d-%H-%M-%S"), exp_name)
 final_path = os.path.join(root_dir, "logs", log_dir)
 if not os.path.exists(final_path):
