@@ -125,13 +125,13 @@ def train_or_val(flag, data_loader):
 data_dir = os.path.join(root_dir, 'data')
 
 train_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=500, augment=None)
-train_data_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE)
+train_data_loader = DataLoader(train_dataset, batch_size=64)
 test_dataset = ForwardDatasetClassification(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=100, augment=None)
-test_data_loader = DataLoader(test_dataset, batch_size=8)
+test_data_loader = DataLoader(test_dataset, batch_size=64)
 
 model = ICMModel().cuda()
 
-optimizer = optim.Adam(model.parameters(), lr=LR)
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
 wandb.init(project='forward_inverse_model')
 wandb.config.update({"exp_name": "classify_3classes",
                      "batch_size": BATCH_SIZE,
@@ -156,13 +156,13 @@ if TRAIN:
         inverse_loss_train, accuracy_train = train_or_val('train', train_data_loader)
         # eval
         inverse_loss_val, accuracy_val = train_or_val('val', test_data_loader)
-        #pred_languages, accuracy_test = evaluate_inverse_model(train_dataset, model)
-        #print(pred_languages)
+        pred_languages, accuracy_test = evaluate_inverse_model(train_dataset, model)
+        print(pred_languages)
         wandb.log({"inverse_loss_train": inverse_loss_train.item(),
                    "inverse_loss_val": inverse_loss_val.item(),
                    "accuracy_train": accuracy_train.item(),
-                   "accuracy_val": accuracy_val.item()})
-                   #"accuracy_test": accuracy_test.item()})
+                   "accuracy_val": accuracy_val.item(),
+                   "accuracy_test": accuracy_test.item()})
 
         if epoch % 10 == 0:
             torch.save(model, os.path.join(final_path, "epoch_{}.pt".format(epoch)))
