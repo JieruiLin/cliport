@@ -135,4 +135,4 @@ class PackingStackingPuttingSameObjects(Task):
                                                          place=color_names[1]))
         
     def get_colors(self):
-        return utils.TRAIN_COLORS if self.mode == 'train' else utils.EVAL_COLORS
+        return utils.TRAIN_COLORS

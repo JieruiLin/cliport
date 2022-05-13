@@ -1,5 +1,5 @@
 export CLIPORT_ROOT=$(pwd)
-python cliport/demos.py n=3000 \
+python cliport/demos.py n=100 \
                         task=packing-stacking-putting-same-objects \
-                        mode=train
+                        mode=val
 

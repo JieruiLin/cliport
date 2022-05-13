@@ -25,7 +25,7 @@ dataset:
 
 # record videos (super slow)
 record:
-  save_video: False
+  save_video: True
   save_video_path: ${data_dir}/${task}-${mode}/videos/
   add_text: False
   fps: 20

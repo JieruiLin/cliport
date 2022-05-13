@@ -153,7 +153,7 @@ def train_or_val(flag, data_loader):
         state = state.cuda().float().permute(0,3,1,2)/255.
         next_state = next_state.cuda().float().permute(0,3,1,2)/255.
         action = action.long().cuda()
-
+        
         pred_action = model(state, next_state)
         inverse_loss = ce(pred_action, action)
         
