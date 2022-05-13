@@ -162,7 +162,8 @@ class TransportEmbeddingGoal(nn.Module):
         self.icm.load_state_dict(torch.load("/home/jerrylin/temp/cliport/icm_model.pt"))
         self.icm.eval()
         self.all_languages = np.load('/home/jerrylin/temp/cliport/data/language_dictionary.npy')
-        self.emb2img = EmbToImg().cuda()
+        self.transport_emb2img = EmbToImg().cuda()
+        self.transport_emb2img_optimizers = torch.optim.Adam(self.transport_emb2img.parameters(), lr=self.cfg['train']['lr'])
 
         # Crop before network (default for Transporters CoRL 2020).
         self.kernel_shape = (self.crop_size, self.crop_size, self.in_shape[2])
@@ -216,7 +217,7 @@ class TransportEmbeddingGoal(nn.Module):
         action_one_hot_embedding = nn.functional.one_hot(action, num_classes=len(self.all_languages))
         real_next_state_feature, pred_next_state_feature, pred_action = self.icm(forward_model_cur_state, forward_model_goal_state, action_one_hot_embedding)
         goal_embedding = pred_next_state_feature.reshape((32,4,4))
-        goal_tensor = self.emb2img(goal_embedding[None])[0].permute(1,2,0)
+        goal_tensor = self.transport_emb2img(goal_embedding[None])[0].permute(1,2,0)
 
         goal_tensor = nn.functional.pad(goal_tensor, (0,0,32,32,32,32), mode='constant')[None]
         goal_tensor = goal_tensor.permute(0, 3, 1, 2)

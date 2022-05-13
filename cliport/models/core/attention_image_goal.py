@@ -67,7 +67,8 @@ class AttentionEmbeddingGoal(Attention):
         self.icm.load_state_dict(torch.load("/home/jerrylin/temp/cliport/icm_model.pt"))
         self.icm.eval()
         self.all_languages = np.load('/home/jerrylin/temp/cliport/data/language_dictionary.npy')
-        self.emb2img = EmbToImg().cuda()
+        self.attention_emb2img = EmbToImg().cuda()
+        self.attention_emb2img_optimizers = torch.optim.Adam(self.attention_emb2img.parameters(), lr=self.cfg['train']['lr'])
 
     def forward(self, inp_img, goal_img, lang_goal, softmax=True):
         """Forward pass."""
@@ -79,7 +80,7 @@ class AttentionEmbeddingGoal(Attention):
         action_one_hot_embedding = nn.functional.one_hot(action, num_classes=len(self.all_languages))
         real_next_state_feature, pred_next_state_feature, pred_action = self.icm(forward_model_cur_state, forward_model_goal_state, action_one_hot_embedding)
         goal_embedding = pred_next_state_feature.reshape((32,4,4))
-        goal_tensor = self.emb2img(goal_embedding[None])[0].permute(1,2,0)
+        goal_tensor = self.attention_emb2img(goal_embedding[None])[0].permute(1,2,0)
 
         goal_tensor = nn.functional.pad(goal_tensor, (0,0,80,80,0,0), mode='constant')[None]
         # Input image.
