@@ -1,10 +1,11 @@
 import numpy as np
-
 from cliport.utils import utils
 from cliport.agents.transporter import OriginalTransporterAgent
 from cliport.models.core.attention import Attention
 from cliport.models.core.attention_image_goal import AttentionImageGoal, AttentionEmbeddingGoal
 from cliport.models.core.transport_image_goal import TransportImageGoal, TransportEmbeddingGoal
+from cliport.models.forward_model import ICMModel
+import torch
 import torch.nn as nn
 
 class ImageGoalTransporterAgent(OriginalTransporterAgent):
@@ -165,6 +166,9 @@ class EmbeddingGoalTransporterAgent(OriginalTransporterAgent):
     def __init__(self, name, cfg, train_ds, test_ds):
         super().__init__(name, cfg, train_ds, test_ds)
         self.all_languages = np.load('/home/jerrylin/temp/cliport/data/language_dictionary.npy')
+        self.icm = ICMModel().cuda()
+        self.icm.load_state_dict(torch.load("/home/jerrylin/temp/cliport/icm_model.pt"))
+        self.icm.eval()
 
     def _build_model(self):
         stream_fcn = 'plain_resnet'
@@ -189,39 +193,34 @@ class EmbeddingGoalTransporterAgent(OriginalTransporterAgent):
     def attn_forward(self, inp, softmax=True):
         inp_img = inp['inp_img']
         goal_img = inp['goal_img']
-        lang_goal = inp['lang_goal']
-        out = self.attention.forward(inp_img, goal_img, lang_goal, softmax=softmax)
+        out = self.attention.forward(inp_img, goal_img, softmax=softmax)
         return out
 
     def attn_training_step(self, frame, goal, backprop=True, compute_err=False):
         inp_img = frame['img']
-        goal_img = goal['img']
-        lang_goal = frame['lang_goal']
-        cls = np.where(self.all_languages == lang_goal)[0][0]
+
         p0, p0_theta = frame['p0'], frame['p0_theta']
 
-        inp = {'inp_img': inp_img, 'goal_img': goal_img, 'lang_goal': cls}
+        inp = {'inp_img': inp_img, 'goal_img': goal}
         out = self.attn_forward(inp, softmax=False)
         return self.attn_criterion(backprop, compute_err, inp, out, p0, p0_theta)
 
     def trans_forward(self, inp, softmax=True):
         inp_img = inp['inp_img']
         goal_img = inp['goal_img']
-        lang_goal = inp['lang_goal']
+
         p0 = inp['p0']
 
-        out = self.transport.forward(inp_img, goal_img, lang_goal, p0, softmax=softmax)
+        out = self.transport.forward(inp_img, goal_img, p0, softmax=softmax)
         return out
 
     def transport_training_step(self, frame, goal, backprop=True, compute_err=False):
         inp_img = frame['img']
-        goal_img = goal['img']
-        lang_goal = frame['lang_goal']
+
         p0 = frame['p0']
         p1, p1_theta = frame['p1'], frame['p1_theta']
-        cls = np.where(self.all_languages == lang_goal)[0][0]
         
-        inp = {'inp_img': inp_img, 'goal_img': goal_img, 'p0': p0, 'lang_goal': cls}
+        inp = {'inp_img': inp_img, 'goal_img': goal, 'p0': p0}
         out = self.trans_forward(inp, softmax=False)
         err, loss = self.transport_criterion(backprop, compute_err, inp, out, p0, p1, p1_theta)
         return loss, err
@@ -234,11 +233,27 @@ class EmbeddingGoalTransporterAgent(OriginalTransporterAgent):
 
         # Get training losses.
         step = self.total_steps + 1
-        loss0, err0 = self.attn_training_step(frame, goal)
+
+        # get goal embedding with forward model
+        inp_img = frame['img']
+        goal_img = goal['img']
+        lang_goal = frame['lang_goal']
+        lang_goal = np.where(self.all_languages == lang_goal)[0][0]
+
+        forward_model_cur_state = torch.from_numpy(inp_img[None]).cuda().float().permute(0,3,1,2)/255.
+        forward_model_goal_state = torch.from_numpy(goal_img[None]).cuda().float().permute(0,3,1,2)/255.
+        action = torch.from_numpy(lang_goal[None]).long().cuda()
+        # use one hot embedding for language in the forward model; can use clip embedding instead; should compare performance
+        action_one_hot_embedding = nn.functional.one_hot(action, num_classes=len(self.all_languages))
+        _, pred_next_state_feature, _ = self.icm(forward_model_cur_state, forward_model_goal_state, action_one_hot_embedding)
+        # detach gradient
+        goal_embedding = pred_next_state_feature.reshape((32,4,4)).detach()
+
+        loss0, err0 = self.attn_training_step(frame, goal_embedding)
         if isinstance(self.transport, Attention):
-            loss1, err1 = self.attn_training_step(frame, goal)
+            loss1, err1 = self.attn_training_step(frame, goal_embedding)
         else:
-            loss1, err1 = self.transport_training_step(frame, goal)
+            loss1, err1 = self.transport_training_step(frame, goal_embedding)
         total_loss = loss0 + loss1
         self.log('tr/attn/loss', loss0)
         self.log('tr/trans/loss', loss1)
@@ -260,13 +275,28 @@ class EmbeddingGoalTransporterAgent(OriginalTransporterAgent):
         loss0, loss1 = 0, 0
         for i in range(self.val_repeats):
             frame, goal = batch
-            l0, err0 = self.attn_training_step(frame, goal, backprop=False, compute_err=True)
+
+            # get goal embedding with forward model
+            inp_img = frame['img']
+            goal_img = goal['img']
+            lang_goal = frame['lang_goal']
+            lang_goal = np.where(self.all_languages == lang_goal)[0][0]
+
+            forward_model_cur_state = torch.from_numpy(inp_img[None]).cuda().float().permute(0,3,1,2)/255.
+            forward_model_goal_state = torch.from_numpy(goal_img[None]).cuda().float().permute(0,3,1,2)/255.
+            action = torch.from_numpy(lang_goal[None]).long().cuda()
+            # use one hot embedding for language in the forward model; can use clip embedding instead; should compare performance
+            action_one_hot_embedding = nn.functional.one_hot(action, num_classes=len(self.all_languages))
+            _, pred_next_state_feature, _ = self.icm(forward_model_cur_state, forward_model_goal_state, action_one_hot_embedding)
+            goal_embedding = pred_next_state_feature.reshape((32,4,4))
+
+            l0, err0 = self.attn_training_step(frame, goal_embedding, backprop=False, compute_err=True)
             loss0 += l0
             if isinstance(self.transport, Attention):
-                l1, err1 = self.attn_training_step(frame, goal, backprop=False, compute_err=True)
+                l1, err1 = self.attn_training_step(frame, goal_embedding, backprop=False, compute_err=True)
                 loss1 += l1
             else:
-                l1, err1 = self.transport_training_step(frame, goal, backprop=False, compute_err=True)
+                l1, err1 = self.transport_training_step(frame, goal_embedding, backprop=False, compute_err=True)
                 loss1 += l1
         loss0 /= self.val_repeats
         loss1 /= self.val_repeats
@@ -287,8 +317,20 @@ class EmbeddingGoalTransporterAgent(OriginalTransporterAgent):
     def act(self, obs, info=None, goal=None):  # pylint: disable=unused-argument
         """Run inference and return best action given visual observations."""
         # Get heightmap from RGB-D images.
+        # need to get goal image embedding
         img = self.test_ds.get_image(obs)
+        lang_goal = info['lang_goal']
         goal_img = self.test_ds.get_image(goal[0])
+
+        lang_goal = np.where(self.all_languages == lang_goal)[0][0]
+
+        forward_model_cur_state = torch.from_numpy(img[None]).cuda().float().permute(0,3,1,2)/255.
+        forward_model_goal_state = torch.from_numpy(goal_img[None]).cuda().float().permute(0,3,1,2)/255.
+        action = torch.from_numpy(lang_goal[None]).long().cuda()
+        # use one hot embedding for language in the forward model; can use clip embedding instead; should compare performance
+        action_one_hot_embedding = nn.functional.one_hot(action, num_classes=len(self.all_languages))
+        _, pred_next_state_feature, _ = self.icm(forward_model_cur_state, forward_model_goal_state, action_one_hot_embedding)
+        goal_img = pred_next_state_feature.reshape((32,4,4))
 
         # Attention model forward pass.
         pick_conf = self.attention.forward(img, goal_img)

@@ -45,6 +45,7 @@ class TransporterAgent(LightningModule):
             'attn': torch.optim.Adam(self.attention.parameters(), lr=self.cfg['train']['lr']),
             'trans': torch.optim.Adam(self.transport.parameters(), lr=self.cfg['train']['lr'])
         }
+        
         print("Agent: {}, Logging: {}".format(name, cfg['train']['log']))
 
     def _build_model(self):
