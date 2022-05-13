@@ -8,9 +8,7 @@ from cliport.models.untrained_rn50_bert_lingunet import UntrainedRN50BertLingUNe
 
 from cliport.models.clip_unet import CLIPUNet
 from cliport.models.clip_lingunet import CLIPLingUNet
-
-#from cliport.models.resnet_lang import ResNet43_8s_lang
-from cliport.models.resnet_lang_old import ResNet43_8s_lang
+from cliport.models.resnet_lang import ResNet43_8s_lang
 
 from cliport.models.resnet_lat import ResNet45_10s
 from cliport.models.clip_unet_lat import CLIPUNetLat
