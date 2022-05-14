@@ -63,8 +63,7 @@ class RavensDataset(Dataset):
                 raise Exception(f"Requested training on {self.n_demos} demos, but only {self.n_episodes} demos exist in the dataset path: {self._path}.")
 
             # fix index for overfitting exps
-            episodes = np.arange(10)
-            #episodes = np.random.choice(range(self.n_episodes), self.n_demos, False)
+            episodes = np.random.choice(range(self.n_episodes), self.n_demos, False)
             self.set(episodes)
 
 
@@ -345,7 +344,7 @@ class ForwardDatasetClassification(RavensDataset):
 class ForwardDatasetClassificationAllObjects(RavensDataset):
     def __init__(self, path, cfg, n_demos=0, augment=False):
         super().__init__(path, cfg, n_demos, augment)
-        self.all_languages = np.load('/home/jerrylin/temp/cliport/data/language_dictionary.npy')
+        self.all_languages = np.load('{}/data/language_dictionary.npy'.format(os.environ['CLIPORT_ROOT']))
 
     def __getitem__(self, idx):
         # Choose random episode.
