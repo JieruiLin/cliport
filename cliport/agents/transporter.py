@@ -45,6 +45,7 @@ class TransporterAgent(LightningModule):
             'attn': torch.optim.Adam(self.attention.parameters(), lr=self.cfg['train']['lr']),
             'trans': torch.optim.Adam(self.transport.parameters(), lr=self.cfg['train']['lr'])
         }
+        
         print("Agent: {}, Logging: {}".format(name, cfg['train']['log']))
 
     def _build_model(self):
@@ -99,7 +100,11 @@ class TransporterAgent(LightningModule):
             attn_optim = self._optimizers['attn']
             self.manual_backward(loss, attn_optim)
             attn_optim.step()
+            if hasattr(self.attention, 'attention_emb2img_optimizers'):
+                self.attention.attention_emb2img_optimizers.step()
             attn_optim.zero_grad()
+            if hasattr(self.attention, 'attention_emb2img_optimizers'):
+                self.attention.attention_emb2img_optimizers.zero_grad()
 
         # Pixel and Rotation error (not used anywhere).
         err = {}
@@ -154,7 +159,11 @@ class TransporterAgent(LightningModule):
             transport_optim = self._optimizers['trans']
             self.manual_backward(loss, transport_optim)
             transport_optim.step()
+            if hasattr(self.attention, 'transport_emb2img_optimizers'):
+                self.transport.transport_emb2img_optimizers.step()
             transport_optim.zero_grad()
+            if hasattr(self.attention, 'transport_emb2img_optimizers'):
+                self.transport.transport_emb2img_optimizers.zero_grad()
  
         # Pixel and Rotation error (not used anywhere).
         err = {}

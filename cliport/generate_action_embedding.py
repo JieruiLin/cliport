@@ -8,7 +8,7 @@ import clip
 from PIL import Image
 
 
-mode = 'train'
+mode = 'val'
 task = 'packing-stacking-putting-same-objects'
 info_path = '/home/jerrylin/temp/cliport/data/' + task + '-' + mode + '/info/'
 embedding_path = '/home/jerrylin/temp/cliport/data/' + task + '-' + mode + '/embedding/'

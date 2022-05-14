@@ -8,18 +8,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.nn import init
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-from cliport import agents
 from cliport.dataset import ForwardDatasetClassificationAllObjects
 from cliport.utils import utils
-from cliport.environments.environment import Environment
 import wandb
 from tqdm import tqdm
 import clip
 import numpy as np
 import torchvision.models as models
 import time
+from cliport.models.forward_model import ICMModel
 
 mode = 'train'
 augment = True
@@ -48,65 +46,7 @@ test_data_loader = DataLoader(test_dataset, batch_size=batch_size)
 all_languages = np.load(data_dir + "/language_dictionary.npy")
 all_actions = np.load(data_dir + "/action_dictionary.npy")
 
-class ICMModel(nn.Module):
-    def __init__(self, use_cuda=True):
-        super(ICMModel, self).__init__()
-        self.device = torch.device('cuda' if use_cuda else 'cpu')
-        
-        self.feature = models.resnet18()
-        self.feature.fc = nn.Linear(512, 512)
-
-        self.inverse_net = nn.Sequential(
-            nn.Linear(512 * 2, 512),
-            nn.LeakyReLU(),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, 256),
-            nn.LeakyReLU(),
-            nn.Linear(256, len(all_languages))
-        )
-
-        self.residual = [nn.Sequential(
-            nn.Linear(512 + len(all_languages), 512),
-            nn.LeakyReLU(),
-            nn.Linear(512, 512),
-        ).to(self.device)] * 8
-
-        self.forward_net_1 = nn.Sequential(
-            nn.Linear(512 + len(all_languages), 512),
-            nn.LeakyReLU()
-        )
-        self.forward_net_2 = nn.Sequential(
-            nn.Linear(512 + len(all_languages), 512),
-        )
-
-    def forward(self, state, next_state, action):
-        encode_state = self.feature(state[:,:3])
-        encode_next_state = self.feature(next_state[:,:3])
-        # get pred action
-        pred_action = torch.cat((encode_state, encode_next_state), 1)
-        pred_action = self.inverse_net(pred_action)
-        # ---------------------
-
-        # get pred next state
-        pred_next_state_feature_orig = torch.cat((encode_state, action), 1)
-        pred_next_state_feature_orig = self.forward_net_1(pred_next_state_feature_orig)
-
-        # residual
-        for i in range(4):
-            pred_next_state_feature = self.residual[i * 2](torch.cat((pred_next_state_feature_orig, action), 1))
-            pred_next_state_feature_orig = self.residual[i * 2 + 1](
-                torch.cat((pred_next_state_feature, action), 1)) + pred_next_state_feature_orig
-
-        pred_next_state_feature = self.forward_net_2(torch.cat((pred_next_state_feature_orig, action), 1))
-
-        real_next_state_feature = encode_next_state
-        return real_next_state_feature, pred_next_state_feature, pred_action
-
-
-model = ICMModel().cuda()
 mse = nn.MSELoss()
-mse_no_reduction = nn.MSELoss(reduction='none')
 ce = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 wandb.init(project='forward_inverse', entity="gnlp")
@@ -133,7 +73,7 @@ if not os.path.exists(final_path):
     path = Path(final_path)
     path.mkdir(parents=True, exist_ok=True)
 
-def train_or_val(flag, data_loader):
+def train_or_val(flag, data_loader, model, optimizer):
     if flag == 'train':
         model.train()
     else:
@@ -185,6 +125,3 @@ if TRAIN:
             torch.save(model,
                     os.path.join(final_path, "epoch_{}.pt".format(epoch)))
         
-# evaluate 
-# compose a sequence of different actions: different verbs/tasks, different nouns/pbjects. Use inverse model to segment the sequence.
-# image-goal vs. no-goal vs. lang-goal vs. (oracle) image-goal
