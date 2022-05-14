@@ -8,10 +8,9 @@ root_dir = os.environ['CLIPORT_ROOT']
 data_dir = os.path.join(root_dir, 'data')
 all_languages = np.load(data_dir + "/language_dictionary.npy")
 all_actions = np.load(data_dir + "/action_dictionary.npy")
-use_RGBD = True
 
 class ICMModel(nn.Module):
-    def __init__(self, use_cuda=True):
+    def __init__(self, use_cuda=True, use_RGBD=False):
         super(ICMModel, self).__init__()
         self.device = torch.device('cuda' if use_cuda else 'cpu')
         
@@ -43,9 +42,11 @@ class ICMModel(nn.Module):
         self.forward_net_2 = nn.Sequential(
             nn.Linear(512 + len(all_languages), 512),
         )
+        
+        self.use_RGBD = use_RGBD
 
     def forward(self, state, next_state, action):
-        if use_RGBD:
+        if self.use_RGBD:
             encode_state = self.feature(state)
             encode_next_state = self.feature(next_state)
         else:
