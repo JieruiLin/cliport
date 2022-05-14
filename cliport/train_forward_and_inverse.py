@@ -35,6 +35,7 @@ cfg['mode'] = mode
 import sys
 batch_size = int(sys.argv[1])
 lr = float(sys.argv[2])
+use_RGBD = False #True
 
 data_dir = os.path.join(root_dir, 'data')
 train_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=1000, augment=True)
@@ -46,6 +47,8 @@ test_data_loader = DataLoader(test_dataset, batch_size=batch_size)
 all_languages = np.load(data_dir + "/language_dictionary.npy")
 all_actions = np.load(data_dir + "/action_dictionary.npy")
 
+model = ICMModel(use_RGBD=use_RGBD).cuda()
+
 mse = nn.MSELoss()
 ce = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -53,11 +56,13 @@ wandb.init(project='forward_inverse', entity="gnlp")
 
 wandb.config.update({"exp_name": "forward_inverse",
                      "batch_size": batch_size,
-                     "lr": lr})
+                     "lr": lr,
+                     "rgbd": use_RGBD})
 
 wandb_dict = {"exp_name": "forward_inverse",
               "batch_size": batch_size,
-              "lr": lr}
+              "lr": lr,
+              "rgbd": use_RGBD}
 
 exp_name = ""
 
@@ -110,9 +115,13 @@ if TRAIN:
         print()
         print("Epoch: ", epoch)
         # train
-        forward_loss_train, inverse_loss_train, inverse_accuracy_train = train_or_val('train', train_data_loader)
+        forward_loss_train, inverse_loss_train, inverse_accuracy_train = train_or_val('train', train_data_loader,
+                                                                                      model, optimizer,
+                                                                                      )
         # eval
-        forward_loss_val, inverse_loss_val, inverse_accuracy_val = train_or_val('val', test_data_loader)
+        forward_loss_val, inverse_loss_val, inverse_accuracy_val = train_or_val('val', test_data_loader,
+                                                                                model, optimizer,
+                                                                                )
 
         wandb.log({"Train/forward_loss_train": forward_loss_train.item(),
                 "Train/inverse_loss_train": inverse_loss_train.item(),
