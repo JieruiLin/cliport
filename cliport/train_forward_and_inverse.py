@@ -34,8 +34,7 @@ cfg['mode'] = mode
 data_dir = os.path.join(root_dir, 'data')
 train_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=2, augment=None)
 train_data_loader = DataLoader(train_dataset, batch_size=2)
-# use train for now since val has different colors
-test_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-train'), cfg, n_demos=2, augment=None)
+test_dataset = ForwardDatasetClassificationAllObjects(os.path.join(data_dir, f'{cfg["task"]}-val'), cfg, n_demos=2, augment=None)
 test_data_loader = DataLoader(test_dataset, batch_size=2)
 
 all_languages = np.load(data_dir + "/language_dictionary.npy")

@@ -1,28 +1,20 @@
-# CLIPort
+# Grounding Language Goal through Imagination
 
-[**CLIPort: What and Where Pathways for Robotic Manipulation**](https://arxiv.org/pdf/2109.12098.pdf)  
-[Mohit Shridhar](https://mohitshridhar.com/), [Lucas Manuelli](http://lucasmanuelli.com/), [Dieter Fox](https://homes.cs.washington.edu/~fox/)  
-[CoRL 2021](https://www.robot-learning.org/) 
+Goal-conditioned policy learning conditions the policy on a goal in addition to the current observation. Using image or state as goal is not ideal since they are expensive to obtain and provide unnecessary details which hinders generalization. With the recent development of natural language processing (NLP), people start trying language goal for policy learning. They ground language concepts during policy learning, which is extremely hard evidenced by their experimental results.
 
-CLIPort is an end-to-end imitation-learning agent that can learn a single language-conditioned policy for various tabletop tasks. The framework combines the broad semantic understanding (_what_) of [CLIP](https://openai.com/blog/clip/) with the spatial precision (_where_) of [TransporterNets](https://transporternets.github.io/) to learn generalizable skills from limited training demonstrations.
+We propose to first **ground goal language concepts through imagination** to get a goal embedding that is relevent to actions without encoding unnecessary details. Then, we use this goal representation for goal-conditioned policy learning. We demonstrate that our method is equivalent to learning a forward model and an inverse model in the concept space. Experimental results show that our method performs better than some state-of-the-art baselines.
 
-For the latest updates, see: [cliport.github.io](https://cliport.github.io)
+
 
 ![](media/sim_tasks.gif)
 
-## Guides
-
-- Getting Started: [Installation](#installation), [Quick Tutorial](#quickstart), [Checkpoints & Objects](#download), [Hardware Requirements](#hardware-requirements), [Model Card](model-card.md)
-- Data Generation: [Dataset](#dataset-generation), [Tasks](cliport/tasks)
-- Training & Evaluation: [Single Task](#single-task-training--evaluation), [Multi Task](#multi-task-training--evaluation)
-- Miscellaneous: [Notebooks](#notebooks), [Docker Guide](#docker-guide), [Disclaimers](#disclaimers--limitations), [Real-Robot Training FAQ](#real-robot-training-faq), [Recording Videos](#recording-videos)
-- References: [Citations](#citations), [Acknowledgements](#acknowledgements)
+We follow the environmental setup of [CLIPORT](https://arxiv.org/pdf/2109.12098.pdf) and the codebase is built on top of [CLIPORT](https://github.com/cliport/cliport.git).
 
 ## Installation
 
 Clone Repo:
 ```bash
-git clone https://github.com/cliport/cliport.git
+git clone git@github.com:JieruiLin/cliport.git
 ```
 
 Setup virtualenv and install requirements:

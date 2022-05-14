@@ -8,6 +8,7 @@ root_dir = os.environ['CLIPORT_ROOT']
 data_dir = os.path.join(root_dir, 'data')
 all_languages = np.load(data_dir + "/language_dictionary.npy")
 all_actions = np.load(data_dir + "/action_dictionary.npy")
+use_RGBD = True
 
 class ICMModel(nn.Module):
     def __init__(self, use_cuda=True):
@@ -15,6 +16,8 @@ class ICMModel(nn.Module):
         self.device = torch.device('cuda' if use_cuda else 'cpu')
         
         self.feature = models.resnet18()
+        if use_RGBD:
+            self.feature.conv1 = nn.Conv2d(6, 64, (7,7), stride = 2, padding = 3, bias=False)
         self.feature.fc = nn.Linear(512, 512)
 
         self.inverse_net = nn.Sequential(
@@ -42,8 +45,12 @@ class ICMModel(nn.Module):
         )
 
     def forward(self, state, next_state, action):
-        encode_state = self.feature(state[:,:3])
-        encode_next_state = self.feature(next_state[:,:3])
+        if use_RGBD:
+            encode_state = self.feature(state)
+            encode_next_state = self.feature(next_state)
+        else:
+            encode_state = self.feature(state[:,:3])
+            encode_next_state = self.feature(next_state[:,:3])
         # get pred action
         pred_action = torch.cat((encode_state, encode_next_state), 1)
         pred_action = self.inverse_net(pred_action)
