@@ -19,7 +19,7 @@ save_data: True  # write episodes to disk
 dataset:
   type: 'single' # 'single' or 'multi'
   images: True
-  cache: True # load episodes to memory instead of reading from disk
+  cache: False # load episodes to memory instead of reading from disk
   augment:
     theta_sigma: 60 # rotation sigma in degrees; N(mu = 0, sigma = theta_sigma).
 
